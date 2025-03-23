@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <title>SMART App</title>
-  <script src="./lib/js/fhir-client-v0.1.12.js"></script>
+  <!-- <script src="./lib/js/fhir-client-v0.1.12.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.js"></script>
+
 </head>
 <body>
   <h1>Welcome to Your SMART App</h1>
@@ -13,10 +15,10 @@
       .then(client => {
         // Fetch patient data
         client.request("Patient")
-          .then(patient => {
+          .then(res => {
             document.getElementById("patient-info").innerHTML = 
-              `<p>Patient Name: ${patient.name[0].given[0]} ${patient.name[0].family}</p>
-               <p>Birth Date: ${patient.birthDate}</p>`;
+              `<p>Patient Name: ${res.entry[0].resource.name[0].given[0]} ${res.entry[0].resource.name[0].family}</p>
+               <p>Birth Date: ${res.entry[0].resource.birthDate}</p>`;
           })
           .catch(console.error);
       })
