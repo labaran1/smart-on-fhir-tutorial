@@ -2,25 +2,224 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>SMART App</title>
-  <!-- <script src="./lib/js/fhir-client-v0.1.12.js"></script> -->
+  <title>Student Health App</title>
   <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.js"></script>
-
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+    }
+    #searchInput {
+      display: block;
+      width: 100%;
+      max-width: 400px;
+      margin: 20px auto;
+      padding: 10px;
+      font-size: 16px;
+    }
+    #cardContainer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      width: 200px;
+      padding: 15px;
+      cursor: pointer;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .card:hover {
+      transform: scale(1.02);
+    }
+    .card h3 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+    .card p {
+      margin: 5px 0;
+      font-size: 14px;
+    }
+    /* Modal Styles */
+    .modal {
+      display: none; 
+      position: fixed;
+      z-index: 100;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.4);
+    }
+    .modal-content {
+      background-color: #fff;
+      margin: 10% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 90%;
+      max-width: 500px;
+      border-radius: 4px;
+      position: relative;
+    }
+    .close {
+      color: #aaa;
+      position: absolute;
+      right: 15px;
+      top: 10px;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .close:hover,
+    .close:focus {
+      color: #000;
+    }
+  </style>
 </head>
 <body>
-  <h1>Welcome to Your SMART App</h1>
-  <div id="patient-info"></div>
+  <h1>Welcome to Your Student Health App</h1>
+  <input type="text" id="searchInput" placeholder="Search patients by name...">
+  <div id="cardContainer"></div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <span id="closeModal" class="close">&times;</span>
+      <div id="modalDetails"></div>
+    </div>
+  </div>
+
   <script>
+    // Global variables
+    let patientsData = [];
+    let fhirClient = null;
+    const INITIAL_CARD_COUNT = 10;
+
+    // Helper: Build a patient's full name from the FHIR structure
+    function getPatientName(patient) {
+      if (patient.name && patient.name.length > 0) {
+        const given = patient.name[0].given ? patient.name[0].given.join(" ") : "";
+        const family = patient.name[0].family || "";
+        return `${given} ${family}`.trim();
+      }
+      return "Unnamed Patient";
+    }
+
+    // Function to display a set of patient cards
+    function displayPatients(patients) {
+      const container = document.getElementById("cardContainer");
+      container.innerHTML = ""; // Clear previous content
+
+      patients.forEach(patient => {
+        const card = document.createElement("div");
+        card.className = "card";
+        const fullName = getPatientName(patient);
+        card.innerHTML = `
+          <h3>${fullName}</h3>
+          <p><strong>Birth Date:</strong> ${patient.birthDate || "N/A"}</p>
+        `;
+        // Store the patient data as JSON for later use
+        card.dataset.patient = JSON.stringify(patient);
+        card.addEventListener("click", function() {
+          const basicPatient = JSON.parse(this.dataset.patient);
+          // Call additional resource to get more details about the patient
+          fetchFullPatient(basicPatient.id);
+        });
+        container.appendChild(card);
+      });
+    }
+
+    // Function to fetch full patient details using the patient's id
+    function fetchFullPatient(patientId) {
+      if (fhirClient) {
+        fhirClient.request("Patient/" + patientId)
+          .then(fullPatient => {
+            openModal(fullPatient);
+          })
+          .catch(error => {
+            console.error("Error retrieving full patient details:", error);
+            // Fallback: open modal with basic patient info if full details not available
+            const basicPatient = patientsData.find(p => p.id === patientId) || {};
+            openModal(basicPatient);
+          });
+      } else {
+        console.error("FHIR client is not initialized.");
+      }
+    }
+
+    // Open the modal and fill it with detailed patient info
+    function openModal(patient) {
+      let fullName = getPatientName(patient);
+      let detailsHtml = `<h2>${fullName}</h2>`;
+      detailsHtml += `<p><strong>Birth Date:</strong> ${patient.birthDate || "N/A"}</p>`;
+      detailsHtml += `<p><strong>Gender:</strong> ${patient.gender || "N/A"}</p>`;
+
+      if (patient.address && patient.address.length > 0) {
+        const addr = patient.address[0];
+        const addressLines = addr.line ? addr.line.join(", ") : "";
+        detailsHtml += `<p><strong>Address:</strong> ${addressLines} ${addr.city || ""}, ${addr.state || ""} ${addr.postalCode || ""}</p>`;
+      }
+      if (patient.telecom && patient.telecom.length > 0) {
+        const telecomStr = patient.telecom.map(t => `${t.system}: ${t.value}`).join(", ");
+        detailsHtml += `<p><strong>Contact:</strong> ${telecomStr}</p>`;
+      }
+      // You can include additional fields here if desired.
+      document.getElementById("modalDetails").innerHTML = detailsHtml;
+      document.getElementById("modal").style.display = "block";
+    }
+
+    // Search box filtering
+    document.getElementById("searchInput").addEventListener("input", function() {
+      const searchValue = this.value.toLowerCase();
+      let filteredPatients = patientsData.filter(patient => {
+        const fullName = getPatientName(patient).toLowerCase();
+        return fullName.includes(searchValue);
+      });
+      // If search box is empty, only display the initial set of 10 cards.
+      if (searchValue === "") {
+        filteredPatients = patientsData.slice(0, INITIAL_CARD_COUNT);
+      }
+      displayPatients(filteredPatients);
+    });
+
+    // Close modal handlers
+    document.getElementById("closeModal").addEventListener("click", function() {
+      document.getElementById("modal").style.display = "none";
+    });
+    window.addEventListener("click", function(event) {
+      if (event.target === document.getElementById("modal")) {
+        document.getElementById("modal").style.display = "none";
+      }
+    });
+
+    // Fetch patient data from the FHIR server and render initial cards
     FHIR.oauth2.ready()
       .then(client => {
-        // Fetch patient data
+        fhirClient = client; // Store the client globally for later use
         client.request("Patient")
-          .then(res => {
-            document.getElementById("patient-info").innerHTML = 
-              `<p>Patient Name: ${res.entry[0].resource.name[0].given[0]} ${res.entry[0].resource.name[0].family}</p>
-               <p>Birth Date: ${res.entry[0].resource.birthDate}</p>`;
+          .then(bundle => {
+            if (bundle.entry && bundle.entry.length > 0) {
+              // Store all patient resources
+              patientsData = bundle.entry.map(e => e.resource);
+              // Display only the first 10 cards on initial render
+              displayPatients(patientsData.slice(0, INITIAL_CARD_COUNT));
+            } else {
+              document.getElementById("cardContainer").innerHTML = "<p>No patients found.</p>";
+            }
           })
-          .catch(console.error);
+          .catch(error => {
+            console.error("Error fetching patients:", error);
+            document.getElementById("cardContainer").innerHTML = "<p>Error fetching patient data.</p>";
+          });
       })
       .catch(console.error);
   </script>
