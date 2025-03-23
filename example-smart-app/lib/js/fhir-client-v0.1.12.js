@@ -1111,7 +1111,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }, obj);
 	    };
 
-	    var evalPropsExpr = function(exp, args){
+    var evalPropsExpr = function (exp, args) {
+      console.log('love', 'utf8To1')
+        
 	        var exps =  exp.split('||').map(function(x){return x.trim().substring(1);});
 	        for(var i = 0; i < exps.length; i++){
 	            var res = get_in(args, exps[i]);
@@ -1554,6 +1556,8 @@ function hexWrite (buf, string, offset, length) {
     length = strLen / 2
   }
   for (var i = 0; i < length; i++) {
+    console.log('love', 'utf8To2')
+
     var byte = parseInt(string.substr(i * 2, 2), 16)
     assert(!isNaN(byte), 'Invalid hex string')
     buf[offset + i] = byte
@@ -2399,6 +2403,7 @@ function utf8ToBytes (str) {
     } else {
       var start = i
       if (b >= 0xD800 && b <= 0xDFFF) i++
+      console.log('love', 'utf8To3')
       var h = encodeURIComponent(str.slice(start, i+1)).substr(1).split('%')
       for (var j = 0; j < h.length; j++) {
         byteArray.push(parseInt(h[j], 16))
@@ -6201,6 +6206,8 @@ StringDecoder.prototype.write = function(buffer) {
     this.charReceived += size;
     this.charBuffer.copy(this.charBuffer, size, 0, size);
     buffer.copy(this.charBuffer, 0, 0, size);
+    console.log('love', 'utf8To4')
+
     return charStr.substring(0, end);
   }
 
@@ -6821,7 +6828,9 @@ function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
       }
       if (str.indexOf('\n') > -1) {
         if (array) {
-          str = str.split('\n').map(function(line) {
+          str = str.split('\n').map(function (line) {
+      console.log('love', 'utf8To5')
+            
             return '  ' + line;
           }).join('\n').substr(2);
         } else {
@@ -6840,6 +6849,8 @@ function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
     }
     name = JSON.stringify('' + key);
     if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
+      console.log('love', 'utf8To6')
+
       name = name.substr(1, name.length - 2);
       name = ctx.stylize(name, 'name');
     } else {
@@ -16899,6 +16910,8 @@ function urlParam(p, forceArray) {
     forceArray = false;
   }
 
+  console.log('love', 'utf8To7', )
+
   var query = location.search.substr(1);
   var data = query.split("&");
   var result = [];
@@ -16920,8 +16933,10 @@ function urlParam(p, forceArray) {
   return result[0];
 }
 
-function stripTrailingSlash(str) {
-    if(str.substr(-1) === '/') {
+  function stripTrailingSlash(str) {
+    console.log('love', 'utf8To8')
+  
+    if(str?.substr(-1) === '/') {
         return str.substr(0, str.length - 1);
     }
     return str;
@@ -17573,6 +17588,8 @@ function FhirClient(p) {
       if (path.match(/^urn/)) return path;
 
       // strip leading slash
+      console.log('love', 'utf8To10')
+
       if (path.charAt(0) == "/") path = path.substr(1);
 
       return server.serviceUrl + '/' + path;
