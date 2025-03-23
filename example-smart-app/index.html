@@ -114,7 +114,7 @@
       return "Unnamed Patient";
     }
 
-    // Function to display a set of patient cards
+    // Display a set of patient cards
     function displayPatients(patients) {
       const container = document.getElementById("cardContainer");
       container.innerHTML = ""; // Clear previous content
@@ -127,42 +127,48 @@
           <h3>${fullName}</h3>
           <p><strong>Birth Date:</strong> ${patient.birthDate || "N/A"}</p>
         `;
-        // Store the patient data as JSON for later use
+        // Save patient data on the card
         card.dataset.patient = JSON.stringify(patient);
         card.addEventListener("click", function() {
           const basicPatient = JSON.parse(this.dataset.patient);
-          // Call additional resource to get more details about the patient
-          fetchFullPatient(basicPatient.id);
+          // Fetch the full patient details and only Conditions
+          fetchFullPatientAndConditions(basicPatient.id);
         });
         container.appendChild(card);
       });
     }
 
-    // Function to fetch full patient details using the patient's id
-    function fetchFullPatient(patientId) {
+    // Fetch full patient details and Conditions
+    function fetchFullPatientAndConditions(patientId) {
       if (fhirClient) {
-        fhirClient.request("Patient/" + patientId)
-          .then(fullPatient => {
-            openModal(fullPatient);
+        const patientPromise = fhirClient.request("Patient/" + patientId);
+        const conditionPromise = fhirClient.request("Condition?patient=" + patientId);
+        Promise.all([patientPromise, conditionPromise])
+          .then(([fullPatient, conditionBundle]) => {
+            const conditions = (conditionBundle.entry && conditionBundle.entry.length > 0) ?
+              conditionBundle.entry.map(e => e.resource.code && e.resource.code.text).join(", ") :
+              "None";
+            openModal(fullPatient, conditions);
           })
           .catch(error => {
-            console.error("Error retrieving full patient details:", error);
-            // Fallback: open modal with basic patient info if full details not available
+            console.error("Error retrieving conditions:", error);
+            // Fallback: open modal with basic patient info if conditions cannot be fetched.
             const basicPatient = patientsData.find(p => p.id === patientId) || {};
-            openModal(basicPatient);
+            openModal(basicPatient, "N/A");
           });
       } else {
         console.error("FHIR client is not initialized.");
       }
     }
 
-    // Open the modal and fill it with detailed patient info
-    function openModal(patient) {
+    // Open modal and display detailed patient info plus conditions
+    function openModal(patient, conditions) {
       let fullName = getPatientName(patient);
       let detailsHtml = `<h2>${fullName}</h2>`;
       detailsHtml += `<p><strong>Birth Date:</strong> ${patient.birthDate || "N/A"}</p>`;
       detailsHtml += `<p><strong>Gender:</strong> ${patient.gender || "N/A"}</p>`;
-
+      detailsHtml += `<p><strong>Conditions:</strong> ${conditions}</p>`;
+      
       if (patient.address && patient.address.length > 0) {
         const addr = patient.address[0];
         const addressLines = addr.line ? addr.line.join(", ") : "";
@@ -172,7 +178,6 @@
         const telecomStr = patient.telecom.map(t => `${t.system}: ${t.value}`).join(", ");
         detailsHtml += `<p><strong>Contact:</strong> ${telecomStr}</p>`;
       }
-      // You can include additional fields here if desired.
       document.getElementById("modalDetails").innerHTML = detailsHtml;
       document.getElementById("modal").style.display = "block";
     }
@@ -184,7 +189,7 @@
         const fullName = getPatientName(patient).toLowerCase();
         return fullName.includes(searchValue);
       });
-      // If search box is empty, only display the initial set of 10 cards.
+      // If search box is empty, only display the first 10 cards.
       if (searchValue === "") {
         filteredPatients = patientsData.slice(0, INITIAL_CARD_COUNT);
       }
@@ -201,16 +206,14 @@
       }
     });
 
-    // Fetch patient data from the FHIR server and render initial cards
+    // Initialize the app: fetch patient data from the FHIR server and render initial cards
     FHIR.oauth2.ready()
       .then(client => {
-        fhirClient = client; // Store the client globally for later use
+        fhirClient = client; // Save client for later use
         client.request("Patient")
           .then(bundle => {
             if (bundle.entry && bundle.entry.length > 0) {
-              // Store all patient resources
               patientsData = bundle.entry.map(e => e.resource);
-              // Display only the first 10 cards on initial render
               displayPatients(patientsData.slice(0, INITIAL_CARD_COUNT));
             } else {
               document.getElementById("cardContainer").innerHTML = "<p>No patients found.</p>";
